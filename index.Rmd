@@ -18,8 +18,8 @@ library(knitcitations)
 library(ggplot2)
 library(pander)
 library(network)
-bib <- read.bibtex("/Users/kjoseph/Dropbox/Kenny/papers/current/net_models/bib.bibtex")
-source("/Users/kjoseph/Dropbox/Kenny/papers/current/net_models/functions.R")
+bib <- read.bibtex("bib.bibtex")
+source("functions.R")
 ```
 <p class="centered"> <img src="figure/kriv_2009.png"> </p>
 
