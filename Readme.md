@@ -10,4 +10,10 @@ Note that I had some issues with slidify, specifically
 Because of these two issues, I had to do some manual reconfiguring of the index.html page, so what you get from knitting the .Rmd page won't be exactly what
 you get from index.html.  I thus have a copy called final_pres.html, which is what I presented
 
+
+To use this in a way that I'm aware of-
+- clone the repo
+- Open up index.html in a browser
+- Open up index.rmd in Rstudio and play away :)
+
 Hope this is useful to someone!
