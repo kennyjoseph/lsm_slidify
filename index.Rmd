@@ -1,0 +1,481 @@
+---
+title       : Exploring the latent space of LSMs
+subtitle    : 
+author      : Kenny Joseph
+job         : 
+framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow      # 
+widgets     : [mathjax]            # {mathjax, quiz, bootstrap}
+mode        : selfcontained # {standalone, draft}
+---
+
+
+## Introduction
+
+```{r echo=FALSE, message=FALSE}
+library(knitcitations)
+library(ggplot2)
+library(pander)
+library(network)
+bib <- read.bibtex("/Users/kjoseph/Dropbox/Kenny/papers/current/net_models/bib.bibtex")
+source("/Users/kjoseph/Dropbox/Kenny/papers/current/net_models/functions.R")
+```
+<p class="centered"> <img src="figure/kriv_2009.png"> </p>
+
+- With no node-level covariates, the latent space portion of an LSM is just a low-dimensional representation of the network
+  - appropriate as a layout algorithm or for uncovering "clusters" `r citep(bib['krivitsky_representing_2009'])`.
+
+---
+
+## LSM with node covariates
+
+- When node-covariates are of interest, latent space is a "random effect"
+  - influence of node covariates on the network are interpreted as an effect on dyadic formation
+- The latent space represents both unobserved node-level covariates and unexplained network effects.
+- Statistically, LSM are appealing- push out increasingly unexplainable effects to the latent social space
+- But what is the qualitative meaning of the latent space in this case?
+  - Particularly important as LSMs are sold as a way to visualize data
+
+---
+
+## Research questions
+
+- how does the latent space inform us of latent dyadic and network-level effects that drove the formation of the network?
+
+- when no effects exist outside observed node-level covariates, what does the latent space look like?
+  
+- how do these two things change with different parameterizations of the model?
+  
+---
+
+## Overview of approach
+
+- Generate some networks 
+
+- Run LSM on them with different parameterizations
+
+- Visualize the latent space, try and grasp qualitative meaning
+
+- Check the latent space for (non) uniformity where we expect it (semi-qualitatively)
+
+---
+
+## LSM formulation in latentnet
+$$\begin{align*}
+\text{logit}\, P[Y_{ij} = 1 ] &= \beta_k^TX_{ijk} - |Z_i-Z_j|, k = 1...\color{red}K  \\
+\beta_k     &\overset{\text{iid}}{\sim} \text{N}(\xi_k,\psi^2_k)  \\
+Z_i        &\overset{\text{iid}}{\sim} \sum_{g=1}^{\color{red}G} \lambda_g\text{MVN}_d(\mu_g,\sigma_g^2I_d) \\
+\mu_g      &\overset{\text{iid}}{\sim} \text{MVN}_d(0,\omega^2I_d) \\
+\sigma_g^2 &\overset{\text{iid}}{\sim} \sigma_0^2\text{Inv}\chi_\alpha^2 \\
+(\lambda_1,...,\lambda_g) &\overset{\text{iid}}{\sim} \text{Dirichlet}(\nu_1,...,\nu_g)\end{align*}$$
+
+---
+
+## Generating the simulated networks
+
+- Overview
+  - Calculate a similarity matrix w/ a baseline tie probability
+  - Augment these probabilities with shared group information
+  - Draw a random network from the similarity matrix
+  
+- Some default parameters:
+
+```{r}
+  N_ACTORS <- 8
+  OUTGROUP_TIE <- .01
+  INGROUP_TIE <- 1
+  N_COVARIATES <- 1
+  N_GROUPS <- 2
+```
+
+---
+
+## Start with a similarity matrix
+```{r results='asis'}
+  similarity_matrix <- matrix(0, nrow=N_ACTORS,ncol=N_ACTORS)
+  similarity_matrix[upper.tri(similarity_matrix)] <- runif(N_ACTORS*(N_ACTORS-1)/2,0,OUTGROUP_TIE*2)
+  pandoc.table(similarity_matrix, style="rmarkdown",digits=2)
+```
+
+---
+
+## Generate (random) groupings
+```{r results='asis'}
+  ##Get "random"" groupings
+  groupings <- data.frame(id=1:N_ACTORS, Group1=c(rep(1,N_ACTORS/2),rep(2,N_ACTORS/2)))
+  pandoc.table(groupings, style="rmarkdown",digits=2)
+```
+
+---
+## Calculate percentage of group memberships shared
+
+```{r, results='asis'}
+ ##Determine matrix of co-memberships in groups, normalized by number of groups
+  percent_shared_memberships <- ifelse(outer(groupings[,2],groupings[,2], FUN="-") == 0, 1,0)
+  pandoc.table(percent_shared_memberships, style="rmarkdown",digits=2)
+```
+
+---
+
+## Reconfigure similarity matrix w/ group info
+```{r, results='asis'}
+  ##Add to si
+  similarity_matrix <- similarity_matrix + INGROUP_TIE*percent_shared_memberships
+  diag(similarity_matrix) <- 0; similarity_matrix[lower.tri(similarity_matrix)] <- 0
+  similarity_matrix <- ifelse(similarity_matrix > 1, 1, similarity_matrix)
+  pandoc.table(similarity_matrix, style="rmarkdown",digits=2)
+```
+
+---
+
+## Draw a random network from similarity matrix
+```{r results='asis'}
+  random_draw <- matrix(0,nrow=N_ACTORS,ncol=N_ACTORS)
+  random_draw[upper.tri(random_draw)] <- rbinom(rep(1,N_ACTORS*(N_ACTORS-1)/2),1,
+                                            as.vector(similarity_matrix[upper.tri(similarity_matrix)]))
+  lower_indices <- lower.tri(random_draw)
+  random_draw[lower_indices] <- t(random_draw)[lower_indices]
+  pandoc.table(random_draw, style="rmarkdown",digits=2)
+```
+
+---
+
+## Finally, get the network
+
+```{r network, echo=FALSE, fig.align='center',fig.height=8,fig.width=8}
+  net <- as.network.matrix(random_draw)
+  groupings$id <- NULL
+  for(i in colnames(groupings)){
+    net %v% i <- groupings[,i]
+  }
+  plot(net, vertex.col="Group1")
+```
+
+---
+
+## Results
+
+- CIDnetworks vs latentnet packages
+- Visual comparison of latent spaces
+- Check Ripley's L, a common spatial statistic, for uniformity in the latent space where we (don't) expect it
+$$\begin{align*} 
+\hat{K}(t) &= \lambda^{-1}\sum_{i \neq j}\frac{I(d_{ij} \, <  \, t )}{n} \\
+\hat{L}(t) &= (\frac{\hat{K}}{\pi}) \end{align*}$$
+  - Do these latter two for different $NG$, $K$ and $G$
+
+---
+
+## Initial Network Settings
+
+```{r}  
+N_ACTORS <- 50
+OUTGROUP_TIE <- .03
+N_COVARIATES <- 1
+N_GROUPS <- 2
+INGROUP_TIE <- .9
+N_GAUSSIANS <- 1
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=6,fig.height=6}
+
+##Generate a block style matrix with baseline p(y_ij)~U(0,OUTGROUP_TIE*2) likelihood of a tie
+##and then adding INGROUP_TIE to that likelihood if two actors are in the same group
+sim_matrix_blocks_list <- get_block_similarity_matrix(N_ACTORS,N_COVARIATES,N_GROUPS,OUTGROUP_TIE,INGROUP_TIE)
+
+similarity_matrix <- sim_matrix_blocks_list[["similarity_matrix"]]
+groupings <- sim_matrix_blocks_list[["groupings"]]
+
+##Take a random draw from the similarity matrix
+random_draw <- get_random_draw_from_matrix(similarity_matrix) 
+
+##Use this to create a network object
+net <- as.network.matrix(random_draw)
+for(i in colnames(groupings)[2:ncol(groupings)]){
+  net %v% i <- groupings[,i]
+}
+
+plot(net)
+
+```
+  
+---
+
+## CIDnetworks vs ERGMM
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+##Generate latentnet results for ergmm(net~euclidean(2)) and ergmm(net~euclidean(2)+nodematch("Group1"))
+latentnet_results <- run_latentnet(net,
+                                   groupings,
+                                   N_GAUSSIANS,
+                                   0)
+
+##Generate CID results for the same two models
+cidnetworks_results <- run_cidnetworks(random_draw,
+                               groupings,
+                               N_GAUSSIANS,
+                               0)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=12,fig.height=8}
+par(mfrow=c(1,2))
+plot(latentnet_results[[1]])
+plot(cidnetworks_results[[1]],2)
+```
+
+---
+
+## Partialling out node covariates 
+
+```{r}  
+  N_COVARIATES <- 3
+```
+
+```{r cache=TRUE, echo=FALSE,warning=F, message=FALSE}
+  
+  sim_matrix_blocks_list <- 
+    get_block_similarity_matrix(N_ACTORS,N_COVARIATES,
+                                N_GROUPS,OUTGROUP_TIE,INGROUP_TIE)
+  
+  similarity_matrix <- sim_matrix_blocks_list[["similarity_matrix"]]
+  groupings <- sim_matrix_blocks_list[["groupings"]]
+  
+  ##Take a random draw from the similarity matrix
+  random_draw <- get_random_draw_from_matrix(similarity_matrix) 
+  
+  ##Use this to create a network object
+  net <- as.network.matrix(random_draw)
+  for(i in colnames(groupings)[2:ncol(groupings)]){
+    net %v% i <- groupings[,i]
+  }
+  
+  latentnet_results_partialing <- run_latentnet(net,
+                                     groupings,
+                                     N_GAUSSIANS,
+                                     COVARIANCE_MULTIPLIER)
+```
+
+
+```{r fig.align='center', fig.width=9,fig.height=7, cache=TRUE,echo=FALSE,warning=F, message=FALSE}
+  par(mfrow=c(2,2))
+  plot(latentnet_results_partialing[[1]],vertex.col="Group3",vertex.cex=2)
+  plot(latentnet_results_partialing[[2]],vertex.col="Group3",vertex.cex=2)
+  plot(latentnet_results_partialing[[3]],vertex.col="Group3",vertex.cex=2)
+  plot(latentnet_results_partialing[[4]],vertex.col="Group3",vertex.cex=2)
+```
+
+---
+  
+  
+## Modifying the Number of Gaussians
+
+```{r}  
+   N_GAUSSIANS <- 3
+```
+
+```{r  cache=TRUE,echo=FALSE,warning=F, message=FALSE}
+  latentnet_results_gaussians <- run_latentnet(net,
+                                   groupings,
+                                   N_GAUSSIANS,
+                                   COVARIANCE_MULTIPLIER)
+```
+
+```{r fig.align='center', fig.width=9,fig.height=7, cache=TRUE,echo=FALSE,warning=F, message=FALSE}
+par(mfrow=c(2,2))
+plot(latentnet_results_gaussians[[1]],vertex.col='Group3',vertex.cex=2)
+plot(latentnet_results_gaussians[[2]],vertex.col='Group3',vertex.cex=2)
+plot(latentnet_results_gaussians[[3]],vertex.col='Group3',vertex.cex=2)
+plot(latentnet_results_gaussians[[4]],vertex.col='Group3',vertex.cex=2)
+
+
+```
+
+---
+
+## With more groups
+
+```{r}  
+  N_COVARIATES <- 2
+  N_GROUPS <- 4
+  N_GAUSSIANS <- 1
+```
+
+```{r cache=TRUE, echo=FALSE,warning=F, message=FALSE}
+  
+  sim_matrix_blocks_list <- 
+    get_block_similarity_matrix(N_ACTORS,N_COVARIATES,
+                                N_GROUPS,OUTGROUP_TIE,INGROUP_TIE)
+  
+  similarity_matrix <- sim_matrix_blocks_list[["similarity_matrix"]]
+  groupings <- sim_matrix_blocks_list[["groupings"]]
+  
+  ##Take a random draw from the similarity matrix
+  random_draw <- get_random_draw_from_matrix(similarity_matrix) 
+  
+  ##Use this to create a network object
+  net <- as.network.matrix(random_draw)
+  for(i in colnames(groupings)[2:ncol(groupings)]){
+    net %v% i <- groupings[,i]
+  }
+  
+  latentnet_results_partialing_more_groups <- run_latentnet(net,
+                                     groupings,
+                                     N_GAUSSIANS,
+                                     COVARIANCE_MULTIPLIER)
+```
+
+
+```{r fig.align='center', fig.width=14,fig.height=5, cache=TRUE,echo=FALSE,warning=F, message=FALSE}
+  par(mfrow=c(1,3))
+  plot(latentnet_results_partialing_more_groups[[1]],vertex.col="Group2",vertex.cex=2)
+  plot(latentnet_results_partialing_more_groups[[2]],vertex.col="Group2",vertex.cex=2)
+  plot(latentnet_results_partialing_more_groups[[3]],vertex.col="Group2",vertex.cex=2)
+```
+
+---
+   
+## Modifying the Number of Gaussians (again)
+
+```{r}  
+   N_GAUSSIANS <- 2
+```
+
+```{r  cache=TRUE,echo=FALSE,warning=F, message=FALSE}
+  latentnet_results_gaussians_more_groups <- run_latentnet(net,
+                                   groupings,
+                                   N_GAUSSIANS,
+                                   COVARIANCE_MULTIPLIER)
+```
+
+```{r fig.align='center', fig.width=14,fig.height=5, cache=TRUE,echo=FALSE,warning=F, message=FALSE}
+par(mfrow=c(1,3))
+plot(latentnet_results_gaussians_more_groups[[1]],vertex.col='Group2',vertex.cex=2)
+plot(latentnet_results_gaussians_more_groups[[2]],vertex.col='Group2',vertex.cex=2)
+plot(latentnet_results_gaussians_more_groups[[3]],vertex.col='Group2',vertex.cex=2)
+
+```
+
+---
+
+## Ripley's L - Uniform data, 2D-Gaussian data
+
+
+```{r echo=FALSE,warning=F,message=F}
+  
+  r1 <- get_ripleys_l(latentnet_results_partialing[[3]])
+  r2 <- get_ripleys_l(latentnet_results_partialing[[4]])
+  r3 <- get_ripleys_l(latentnet_results_gaussians[[3]])
+  r4 <- get_ripleys_l(latentnet_results_gaussians[[4]])
+  r5 <- get_ripleys_l(latentnet_results_partialing_more_groups[[2]])
+  r6 <- get_ripleys_l(latentnet_results_partialing_more_groups[[3]])
+  r7 <- get_ripleys_l(latentnet_results_gaussians_more_groups[[2]])
+  r8 <- get_ripleys_l(latentnet_results_gaussians_more_groups[[3]])
+```
+
+
+```{r fig.align='center', fig.width=10,fig.height=8, warning=F, message=FALSE, echo=F, cache=T}
+  require(mvtnorm)
+  require(spatstat)
+  random_data <- runifpoint(50)
+  Uniform <- Lest(random_data)
+  mvn <- rmvnorm(100,mean=c(0,0), sigma=matrix(c(.125,0,0,.125),ncol=2))
+  Gaussian <- Lest(as.ppp(mvn,c(min(mvn[,1]),max(mvn[,1]),min(mvn[,2]),max(mvn[,2]))))
+  par(mfrow=c(2,2)); 
+  plot(Uniform); plot(Gaussian); plot(random_data$x, random_data$y); plot(mvn)
+
+```
+
+---
+
+
+## Ripley's L - Partialling data
+
+```{r fig.align='center', fig.width=10,fig.height=8, echo=FALSE,warning=F}
+  require(latentnet)
+  par(mfrow=c(2,2))
+  plot(r1)
+  plot(r2)
+ 
+  plot.ergmm(latentnet_results_partialing[[3]],vertex.col="Group3",vertex.cex=2)
+  plot(latentnet_results_partialing[[4]],vertex.col="Group3",vertex.cex=2)
+
+```
+
+---
+
+## Ripley's L - W/ ++ Gaussians
+
+```{r fig.align='center', fig.width=10,fig.height=8, echo=FALSE,warning=F, message=FALSE}
+    require(latentnet)
+  par(mfrow=c(2,2))
+  plot(r3); plot(r4)
+  plot(latentnet_results_gaussians[[3]],vertex.col="Group3",vertex.cex=2)
+  plot(latentnet_results_gaussians[[4]],vertex.col="Group3",vertex.cex=2)
+
+```
+
+---
+
+## Ripley's L - More Groups
+
+```{r fig.align='center', fig.width=10,fig.height=8, echo=FALSE,warning=F, message=FALSE}
+  require(latentnet)
+  par(mfrow=c(2,2))
+  plot(r5); plot(r6)
+  plot(latentnet_results_partialing_more_groups[[2]],vertex.col="Group2",vertex.cex=2)
+  plot(latentnet_results_partialing_more_groups[[3]],vertex.col="Group2",vertex.cex=2)
+  
+```
+
+---
+
+## Ripley's L - More Groups, ++ Gaussians
+
+```{r fig.align='center', fig.width=10,fig.height=8, echo=FALSE,warning=F, message=FALSE}
+  require(latentnet)
+  par(mfrow=c(2,2))
+  plot(r3); plot(r4)
+    plot(latentnet_results_gaussians_more_groups[[2]],vertex.col="Group2",vertex.cex=2)
+  plot(latentnet_results_gaussians_more_groups[[3]],vertex.col="Group2",vertex.cex=2)
+
+```
+
+---
+
+
+## Next Steps - Experimental Design
+
+|         Parameter Name | Description   |      Conditions                |
+|:---------------------:| :---: | :-----------------------------------------------:|
+|      $N$ |  Number of actors        |     50             |
+|     $d_{out}$ |  Baseline tie density       |   .01, .1    |
+|   $d_{in}$ |  Within group tie probability   | .3, .6 |
+|     $K$    | Number of covariates in model |    0, 1, 3 |
+| $NG$  |  Number of groups per covariate |      2, 4            |
+|   $G$  | Number of Gaussians  |            1, 2, 3         |
+| $\sigma_0$ | Covariance of Gaussians | .125, ? | 
+| ... | Graph structure | Core-periphary | 
+
+- Run an LSM on each combination of these parameters
+- Get some kind of point estimate of $\hat{L}(t)$
+
+---  
+
+## Conclusion
+- "Findings"
+  - The latent space does give some inclination as to dyadic covariates missing from the model
+  - When the latent space is representing only noise, it appears close to a random process along Ripley's L
+  - Neither of these things appear to change much with a "mis-parameterized" LSM
+- None of this is particularly surprising. But...
+  - In playing around, I noticed that as OUTGROUP_TIE decreased, these results deteriorate
+  - Thus, it would be interesting to work with more realistic networks and see if these results hold
+
+---
+  
+## Bibliography
+
+```{r results='asis', echo=FALSE}
+bibliography()
+
+```
+

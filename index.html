@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Exploring the latent space of LSMs</title>
+  <meta charset="utf-8">
+  <meta name="description" content="Exploring the latent space of LSMs">
+  <meta name="author" content="Kenny Joseph">
+  <meta name="generator" content="slidify" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta http-equiv="X-UA-Compatible" content="chrome=1">
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/default.css" media="all" >
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/phone.css" 
+    media="only screen and (max-device-width: 480px)" >
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/slidify.css" >
+  <link rel="stylesheet" href="libraries/highlighters/highlight.js/css/tomorrow.css" />
+  <base target="_blank"> <!-- This amazingness opens all links in a new tab. -->  <link rel=stylesheet href="./assets/css/ribbons.css"></link>
+
+  
+  <!-- Grab CDN jQuery, fall back to local if offline -->
+  <script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.7.min.js"></script>
+  <script>window.jQuery || document.write('<script src="libraries/widgets/quiz/js/jquery.js"><\/script>')</script> 
+  <script data-main="libraries/frameworks/io2012/js/slides" 
+    src="libraries/frameworks/io2012/js/require-1.0.8.min.js">
+  </script>
+  
+  
+
+</head>
+<body style="opacity: 0">
+  <slides class="layout-widescreen">
+    
+    <!-- LOGO SLIDE -->
+        <slide class="title-slide segue nobackground">
+  <hgroup class="auto-fadein">
+    <h1>Exploring the latent space of LSMs</h1>
+    <h2></h2>
+    <p>Kenny Joseph<br/></p>
+  </hgroup>
+  <article></article>  
+</slide>
+    
+
+    <!-- SLIDES -->
+    <slide class="" id="slide-1" style="background:;">
+  <hgroup>
+    <h2>Introduction</h2>
+  </hgroup>
+  <article data-timings="">
+    <p class="centered"> <img src="figure/kriv_2009.png"> </p>
+
+<ul>
+<li>With no node-level covariates, the latent space portion of an LSM is just a low-dimensional representation of the network
+
+<ul>
+<li>appropriate as a layout algorithm or for uncovering &quot;clusters&quot; (<a href="http://dx.doi.org/10.1016/j.socnet.2009.04.001">Krivitsky et al. 2009</a>).</li>
+</ul></li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-2" style="background:;">
+  <hgroup>
+    <h2>LSM with node covariates</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li>When node-covariates are of interest, latent space is a &quot;random effect&quot;
+
+<ul>
+<li>influence of node covariates on the network are interpreted as an effect on dyadic formation</li>
+</ul></li>
+<li>The latent space represents both unobserved node-level covariates and unexplained network effects.</li>
+<li>Statistically, LSM are appealing- push out increasingly unexplainable effects to the latent social space</li>
+<li>But what is the qualitative meaning of the latent space in this case?
+
+<ul>
+<li>Particularly important as LSMs are sold as a way to visualize data</li>
+</ul></li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-3" style="background:;">
+  <hgroup>
+    <h2>Research questions</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li><p>how does the latent space inform us of latent dyadic and network-level effects that drove the formation of the network?</p></li>
+<li><p>when no effects exist outside observed node-level covariates, what does the latent space look like?</p></li>
+<li><p>how do these two things change with different parameterizations of the model?</p></li>
+</ul>
+
+<hr>
+
+<h2>Overview of approach</h2>
+
+<ul>
+<li><p>Generate some networks </p></li>
+<li><p>Run LSM on them with different parameterizations</p></li>
+<li><p>Visualize the latent space, try and grasp qualitative meaning</p></li>
+<li><p>Check the latent space for (non) uniformity where we expect it (semi-qualitatively)</p></li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-4" style="background:;">
+  <hgroup>
+    <h2>LSM formulation in latentnet</h2>
+  </hgroup>
+  <article data-timings="">
+    <p>\[\begin{align*}
+\text{logit}\, P[Y_{ij} = 1 ] &= \beta_k^TX_{ijk} - |Z_i-Z_j|, k = 1...\color{red}K  \\
+\beta_k     &\overset{\text{iid}}{\sim} \text{N}(\xi_k,\psi^2_k)  \\
+Z_i        &\overset{\text{iid}}{\sim} \sum_{g=1}^{\color{red}G} \lambda_g\text{MVN}_d(\mu_g,\sigma_g^2I_d) \\
+\mu_g      &\overset{\text{iid}}{\sim} \text{MVN}_d(0,\omega^2I_d) \\
+\sigma_g^2 &\overset{\text{iid}}{\sim} \sigma_0^2\text{Inv}\chi_\alpha^2 \\
+(\lambda_1,...,\lambda_g) &\overset{\text{iid}}{\sim} \text{Dirichlet}(\nu_1,...,\nu_g)\end{align*}\]</p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-5" style="background:;">
+  <hgroup>
+    <h2>Generating the simulated networks</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li><p>Overview</p>
+
+<ul>
+<li>Calculate a similarity matrix w/ a baseline tie probability</li>
+<li>Augment these probabilities with shared group information</li>
+<li>Draw a random network from the similarity matrix</li>
+</ul></li>
+<li><p>Some default parameters:</p></li>
+</ul>
+
+<pre><code class="r">N_ACTORS &lt;- 8
+OUTGROUP_TIE &lt;- 0.01
+INGROUP_TIE &lt;- 1
+N_COVARIATES &lt;- 1
+N_GROUPS &lt;- 2
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-6" style="background:;">
+  <hgroup>
+    <h2>Start with a similarity matrix</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">similarity_matrix &lt;- matrix(0, nrow = N_ACTORS, ncol = N_ACTORS)
+similarity_matrix[upper.tri(similarity_matrix)] &lt;- runif(N_ACTORS * (N_ACTORS - 
+    1)/2, 0, OUTGROUP_TIE * 2)
+pandoc.table(similarity_matrix, style = &quot;rmarkdown&quot;, digits = 2)
+</code></pre>
+
+<table><thead>
+<tr>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="center">0</td>
+<td align="center">0.00096</td>
+<td align="center">0.0058</td>
+<td align="center">0.0099</td>
+<td align="center">0.018</td>
+<td align="center">0.0097</td>
+<td align="center">0.002</td>
+<td align="center">0.018</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.0091</td>
+<td align="center">0.016</td>
+<td align="center">0.016</td>
+<td align="center">0.019</td>
+<td align="center">0.011</td>
+<td align="center">0.0098</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.011</td>
+<td align="center">0.015</td>
+<td align="center">0.0054</td>
+<td align="center">0.019</td>
+<td align="center">0.018</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.0069</td>
+<td align="center">0.014</td>
+<td align="center">0.011</td>
+<td align="center">0.0049</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.00052</td>
+<td align="center">0.017</td>
+<td align="center">0.008</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.018</td>
+<td align="center">0.018</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.013</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-7" style="background:;">
+  <hgroup>
+    <h2>Generate (random) groupings</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">## Get &#39;random&#39;&#39; groupings
+groupings &lt;- data.frame(id = 1:N_ACTORS, Group1 = c(rep(1, N_ACTORS/2), rep(2, 
+    N_ACTORS/2)))
+pandoc.table(groupings, style = &quot;rmarkdown&quot;, digits = 2)
+</code></pre>
+
+<table><thead>
+<tr>
+<th align="center">id</th>
+<th align="center">Group1</th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="center">2</td>
+</tr>
+<tr>
+<td align="center">6</td>
+<td align="center">2</td>
+</tr>
+<tr>
+<td align="center">7</td>
+<td align="center">2</td>
+</tr>
+<tr>
+<td align="center">8</td>
+<td align="center">2</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-8" style="background:;">
+  <hgroup>
+    <h2>Calculate percentage of group memberships shared</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">## Determine matrix of co-memberships in groups, normalized by number of
+## groups
+percent_shared_memberships &lt;- ifelse(outer(groupings[, 2], groupings[, 2], FUN = &quot;-&quot;) == 
+    0, 1, 0)
+pandoc.table(percent_shared_memberships, style = &quot;rmarkdown&quot;, digits = 2)
+</code></pre>
+
+<table><thead>
+<tr>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-9" style="background:;">
+  <hgroup>
+    <h2>Reconfigure similarity matrix w/ group info</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">## Add to si
+similarity_matrix &lt;- similarity_matrix + INGROUP_TIE * percent_shared_memberships
+diag(similarity_matrix) &lt;- 0
+similarity_matrix[lower.tri(similarity_matrix)] &lt;- 0
+similarity_matrix &lt;- ifelse(similarity_matrix &gt; 1, 1, similarity_matrix)
+pandoc.table(similarity_matrix, style = &quot;rmarkdown&quot;, digits = 2)
+</code></pre>
+
+<table><thead>
+<tr>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0.018</td>
+<td align="center">0.0097</td>
+<td align="center">0.002</td>
+<td align="center">0.018</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0.016</td>
+<td align="center">0.019</td>
+<td align="center">0.011</td>
+<td align="center">0.0098</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">0.015</td>
+<td align="center">0.0054</td>
+<td align="center">0.019</td>
+<td align="center">0.018</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.0069</td>
+<td align="center">0.014</td>
+<td align="center">0.011</td>
+<td align="center">0.0049</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-10" style="background:;">
+  <hgroup>
+    <h2>Draw a random network from similarity matrix</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">random_draw &lt;- matrix(0, nrow = N_ACTORS, ncol = N_ACTORS)
+random_draw[upper.tri(random_draw)] &lt;- rbinom(rep(1, N_ACTORS * (N_ACTORS - 
+    1)/2), 1, as.vector(similarity_matrix[upper.tri(similarity_matrix)]))
+lower_indices &lt;- lower.tri(random_draw)
+random_draw[lower_indices] &lt;- t(random_draw)[lower_indices]
+pandoc.table(random_draw, style = &quot;rmarkdown&quot;, digits = 2)
+</code></pre>
+
+<table><thead>
+<tr>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">0</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-11" style="background:;">
+  <hgroup>
+    <h2>Finally, get the network</h2>
+  </hgroup>
+  <article data-timings="">
+    <p><img src="figure/network.png" title="plot of chunk network" alt="plot of chunk network" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-12" style="background:;">
+  <hgroup>
+    <h2>Results</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li>CIDnetworks vs latentnet packages</li>
+<li>Visual comparison of latent spaces</li>
+<li>Check Ripley&#39;s L, a common spatial statistic, for uniformity in the latent space where we (don&#39;t) expect it
+\[\begin{align*} 
+\hat{K}(t) &= \lambda^{-1}\sum_{i \neq j}\frac{I(d_{ij} \, <  \, t )}{n} \\
+\hat{L}(t) &= (\frac{\hat{K}}{\pi}) \end{align*}\]
+
+<ul>
+<li>Do these latter two for different \(NG\), \(K\) and \(G\)</li>
+</ul></li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-13" style="background:;">
+  <hgroup>
+    <h2>Initial Network Settings</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">N_ACTORS &lt;- 50
+OUTGROUP_TIE &lt;- 0.03
+N_COVARIATES &lt;- 1
+N_GROUPS &lt;- 2
+INGROUP_TIE &lt;- 0.9
+N_GAUSSIANS &lt;- 1
+</code></pre>
+
+<p><img src="figure/unnamed-chunk-9.png" title="plot of chunk unnamed-chunk-9" alt="plot of chunk unnamed-chunk-9" style="display: block; margin: auto;" /></p>
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-14" style="background:;">
+
+<h2>CIDnetworks vs ERGMM</h2>
+
+<p><img src="figure/unnamed-chunk-11.png" title="plot of chunk unnamed-chunk-11" alt="plot of chunk unnamed-chunk-11" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-15" style="background:;">
+  <hgroup>
+    <h2>Partialling out node covariates</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">N_COVARIATES &lt;- 3
+</code></pre>
+
+<p><img src="figure/unnamed-chunk-14.png" title="plot of chunk unnamed-chunk-14" alt="plot of chunk unnamed-chunk-14" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-16" style="background:;">
+  <hgroup>
+    <h2>Modifying the Number of Gaussians</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">N_GAUSSIANS &lt;- 3
+</code></pre>
+
+<p><img src="figure/unnamed-chunk-17.png" title="plot of chunk unnamed-chunk-17" alt="plot of chunk unnamed-chunk-17" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-17" style="background:;">
+  <hgroup>
+    <h2>With more groups</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">N_COVARIATES &lt;- 2
+N_GROUPS &lt;- 4
+N_GAUSSIANS &lt;- 1
+</code></pre>
+
+<p><img src="figure/unnamed-chunk-20.png" title="plot of chunk unnamed-chunk-20" alt="plot of chunk unnamed-chunk-20" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-18" style="background:;">
+  <hgroup>
+    <h2>Modifying the Number of Gaussians (again)</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">N_GAUSSIANS &lt;- 2
+</code></pre>
+
+<p><img src="figure/unnamed-chunk-23.png" title="plot of chunk unnamed-chunk-23" alt="plot of chunk unnamed-chunk-23" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-19" style="background:;">
+  <hgroup>
+    <h2>Ripley&#39;s L - Uniform data, 2D-Gaussian data</h2>
+  </hgroup>
+  <article data-timings="">
+    <p><img src="figure/unnamed-chunk-25.png" title="plot of chunk unnamed-chunk-25" alt="plot of chunk unnamed-chunk-25" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-20" style="background:;">
+  <hgroup>
+    <h2>Ripley&#39;s L - Partialling data</h2>
+  </hgroup>
+  <article data-timings="">
+
+<p><img src="figure/unnamed-chunk-26.png" title="plot of chunk unnamed-chunk-26" alt="plot of chunk unnamed-chunk-26" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-21" style="background:;">
+  <hgroup>
+    <h2>Ripley&#39;s L - W/ ++ Gaussians</h2>
+  </hgroup>
+  <article data-timings="">
+
+
+<p><img src="figure/unnamed-chunk-27.png" title="plot of chunk unnamed-chunk-27" alt="plot of chunk unnamed-chunk-27" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-22" style="background:;">
+  <hgroup>
+    <h2>Ripley&#39;s L - More Groups</h2>
+  </hgroup>
+  <article data-timings="">
+
+<p><img src="figure/unnamed-chunk-28.png" title="plot of chunk unnamed-chunk-28" alt="plot of chunk unnamed-chunk-28" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-23" style="background:;">
+  <hgroup>
+    <h2>Ripley&#39;s L - More Groups, ++ Gaussians</h2>
+  </hgroup>
+  <article data-timings="">
+
+<p><img src="figure/unnamed-chunk-29.png" title="plot of chunk unnamed-chunk-29" alt="plot of chunk unnamed-chunk-29" style="display: block; margin: auto;" /></p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-25" style="background:;">
+  <hgroup>
+    <h2>Ripley&#39;s L - Low tie density </h2>
+  </hgroup>
+  <article data-timings="">
+    <p> <img src="figure/weird_low_tie_prob.png" style="display: block; margin: auto;" /></p>
+  </article>
+</slide>
+
+<slide class="" id="slide-25" style="background:;">
+  <hgroup>
+    <h2>Ripley&#39;s L - Low tie density - cont.</h2>
+  </hgroup>
+  <article data-timings="">
+    <p> <img src="figure/weird_low_tie_prob_2.png" style="display: block; margin: auto;" /></p>
+  </article>
+</slide>
+
+<slide class="" id="slide-24" style="background:;">
+  <hgroup>
+    <h2>Next Steps - Experimental Design</h2>
+  </hgroup>
+  <article data-timings="">
+    <table><thead>
+<tr>
+<th align="center">Parameter Name</th>
+<th align="center">Description</th>
+<th align="center">Conditions</th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="center">\(N\)</td>
+<td align="center">Number of actors</td>
+<td align="center">50</td>
+</tr>
+<tr>
+<td align="center">\(d_{out}\)</td>
+<td align="center">Baseline tie density</td>
+<td align="center">.01, .1</td>
+</tr>
+<tr>
+<td align="center">\(d_{in}\)</td>
+<td align="center">Within group tie probability</td>
+<td align="center">.3, .6</td>
+</tr>
+<tr>
+<td align="center">\(K\)</td>
+<td align="center">Number of covariates in model</td>
+<td align="center">0, 1, 3</td>
+</tr>
+<tr>
+<td align="center">\(NG\)</td>
+<td align="center">Number of groups per covariate</td>
+<td align="center">2, 4</td>
+</tr>
+<tr>
+<td align="center">\(G\)</td>
+<td align="center">Number of Gaussians</td>
+<td align="center">1, 2, 3</td>
+</tr>
+<tr>
+<td align="center">\(\sigma_0\)</td>
+<td align="center">Covariance of Gaussians</td>
+<td align="center">.125, ?</td>
+</tr>
+<tr>
+<td align="center">...</td>
+<td align="center">Graph structure</td>
+<td align="center">Core-periphary</td>
+</tr>
+</tbody></table>
+
+<ul>
+<li>Run an LSM on each combination of these parameters</li>
+<li>Get some kind of point estimate of \(\hat{L}(t)\)</li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-25" style="background:;">
+  <hgroup>
+    <h2>Conclusion</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li>&quot;Findings&quot;
+
+<ul>
+<li>The latent space does give some inclination as to dyadic covariates missing from the model</li>
+<li>When the latent space is representing only noise, it appears close to a random process along Ripley&#39;s L</li>
+<li>Neither of these things appear to change much with a &quot;mis-parameterized&quot; LSM</li>
+</ul></li>
+<li>None of this is particularly surprising. But...
+
+<ul>
+<li>In playing around, I noticed that as OUTGROUP_TIE decreased, these results deteriorate</li>
+<li>Thus, it would be interesting to work with more realistic networks and see if these results hold</li>
+</ul></li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-26" style="background:;">
+  <hgroup>
+    <h2>Bibliography</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li>Pavel Krivitsky, Mark Handcock, Adrian Raftery, Peter Hoff,   (2009) Representing degree distributions, clustering, and homophily in social networks with latent cluster random effects models.  <em>Social Networks</em>  <strong>31</strong>  (3)   204-213  <a href="http://dx.doi.org/10.1016/j.socnet.2009.04.001">10.1016/j.socnet.2009.04.001</a></li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+    <slide class="backdrop"></slide>
+  </slides>
+  <div class="pagination pagination-small" id='io2012-ptoc' style="display:none;">
+    <ul>
+      <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=1 title='Introduction'>
+         1
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=2 title='LSM with node covariates'>
+         2
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=3 title='Research questions'>
+         3
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=4 title='LSM formulation in latentnet'>
+         4
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=5 title='Generating the simulated networks'>
+         5
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=6 title='Start with a similarity matrix'>
+         6
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=7 title='Generate (random) groupings'>
+         7
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=8 title='Calculate percentage of group memberships shared'>
+         8
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=9 title='Reconfigure similarity matrix w/ group info'>
+         9
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=10 title='Draw a random network from similarity matrix'>
+         10
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=11 title='Finally, get the network'>
+         11
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=12 title='Results'>
+         12
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=13 title='Initial Network Settings'>
+         13
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=14 title='CIDnetworks vs. ERGMM'>
+         14
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=15 title='Partialling out node covariates'>
+         15
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=16 title='Modifying the Number of Gaussians'>
+         16
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=17 title='With more groups'>
+         17
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=18 title='Modifying the Number of Gaussians (again)'>
+         18
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=19 title='Ripley&#39;s L - Uniform data, 2D-Gaussian data'>
+         19
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=20 title='Ripley&#39;s L - Partialling data'>
+         20
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=21 title='Ripley&#39;s L - W/ ++ Gaussians'>
+         21
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=22 title='Ripley&#39;s L - More Groups'>
+         22
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=23 title='Ripley&#39;s L - More Groups, ++ Gaussians'>
+         23
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=24 title='Ripley&#39;s L - Low tie density'>
+         24
+      </a>
+    </li>
+        <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=25 title='Ripley&#39;s L - Low tie density - cont.'>
+         25 
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=26 title='Next Steps - Experimental Design'>
+         26
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=27 title='Conclusion'>
+         27
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=28 title='Bibliography'>
+         28
+      </a>
+    </li>
+
+  </ul>
+  </div>  <!--[if IE]>
+    <script 
+      src="http://ajax.googleapis.com/ajax/libs/chrome-frame/1/CFInstall.min.js">  
+    </script>
+    <script>CFInstall.check({mode: 'overlay'});</script>
+  <![endif]-->
+</body>
+  <!-- Load Javascripts for Widgets -->
+  
+  <!-- MathJax: Fall back to local if CDN offline but local image fonts are not supported (saves >100MB) -->
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        inlineMath: [['$','$'], ['\\(','\\)']],
+        processEscapes: true
+      }
+    });
+  </script>
+  <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/2.0-latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+  <!-- <script src="https://c328740.ssl.cf1.rackcdn.com/mathjax/2.0-latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script> -->
+  <script>window.MathJax || document.write('<script type="text/x-mathjax-config">MathJax.Hub.Config({"HTML-CSS":{imageFont:null}});<\/script><script src="libraries/widgets/mathjax/MathJax.js?config=TeX-AMS-MML_HTMLorMML"><\/script>')
+</script>
+<!-- LOAD HIGHLIGHTER JS FILES -->
+  <script src="libraries/highlighters/highlight.js/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  <!-- DONE LOADING HIGHLIGHTER JS FILES -->
+   
+  </html>
